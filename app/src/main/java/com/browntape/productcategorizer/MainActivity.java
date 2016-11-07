@@ -125,13 +125,25 @@ public class MainActivity extends AppCompatActivity {
                     //System.out.println(pair.getKey() + " = " + pair.getValue());
                     HashMap obj = (HashMap)pair.getValue();
                     String title = (String)obj.get("title");
-                    Log.w(TAG, title);
+                    HashMap subcats = (HashMap)obj.get("sub_cats");
+                    Iterator sc = subcats.entrySet().iterator();
+
+                    Log.w(TAG+"-c-", title);
 
                     ExpandableListAdapter.Item rootCat = new ExpandableListAdapter.Item(ExpandableListAdapter.HEADER, title);
-                    //rootCat.invisibleChildren = new ArrayList<>();
-                    //rootCat.invisibleChildren.add(new ExpandableListAdapter.Item(ExpandableListAdapter.CHILD, "Kerala"));
-                    mCategoryList.add(rootCat);
+                    rootCat.invisibleChildren = new ArrayList<>();
+                    //loop through the sub categories
+                    while (sc.hasNext()) {
+                        Map.Entry spair = (Map.Entry)sc.next();
+                        HashMap sobj = (HashMap)spair.getValue();
+                        String stitle = (String)sobj.get("title");
+                        Log.w(TAG + "---sc-", stitle);
 
+                        rootCat.invisibleChildren.add(new ExpandableListAdapter.Item(ExpandableListAdapter.CHILD, stitle));
+                        sc.remove();
+                    }
+
+                    mCategoryList.add(rootCat);
                     it.remove(); // avoids a ConcurrentModificationException
                 }
                 recyclerview.setAdapter(new ExpandableListAdapter(mCategoryList));
