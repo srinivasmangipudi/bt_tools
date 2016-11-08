@@ -1,5 +1,6 @@
 package com.browntape.productcategorizer;
 
+import android.app.ProgressDialog;
 import android.content.Intent;
 import android.os.Bundle;
 import android.support.design.widget.FloatingActionButton;
@@ -10,6 +11,7 @@ import android.support.v7.widget.RecyclerView;
 import android.support.v7.widget.Toolbar;
 import android.util.Log;
 import android.view.View;
+import android.widget.TextView;
 
 import com.google.firebase.database.DataSnapshot;
 import com.google.firebase.database.DatabaseError;
@@ -34,7 +36,14 @@ public class MainActivity extends AppCompatActivity {
     private FirebaseDatabase mDatabase;
     private static final String TAG = "Mains";
     private Map<String, Object> mCategoryMap;
+    private Map<String, Object> mProductMap;
     private List<ExpandableListAdapter.Item> mCategoryList;
+    private Product mProduct;
+    private List<Product> mProductsList;
+
+    //views
+    private TextView mItemTitleTextView;
+    private ProgressDialog mProgress;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -49,7 +58,7 @@ public class MainActivity extends AppCompatActivity {
         FloatingActionButton fab = (FloatingActionButton) findViewById(R.id.fab);
         //FirebaseApp.getDefaultConfig().setPersistenceEnabled(true);
         mCategoryList = new ArrayList<>();
-
+        mProductsList = new ArrayList<>();
         mDatabase = Utils.getDatabase();
 
         Intent intent = getIntent();
@@ -57,6 +66,13 @@ public class MainActivity extends AppCompatActivity {
         final String username = intent.getStringExtra("username");
         final String email = intent.getStringExtra("email");
         //final String photourl = intent.getStringExtra("photourl");
+
+        mItemTitleTextView = (TextView) findViewById(R.id.product_title);
+        mProgress = new ProgressDialog(this);
+        mProgress.setTitle("Loading");
+        mProgress.setMessage("Wait while loading...");
+        mProgress.setCancelable(false); // disable dismiss by tapping outside of the dialog
+        mProgress.show();
 
         writeNewUser(userid, username, email);
 
@@ -70,6 +86,7 @@ public class MainActivity extends AppCompatActivity {
 
         //dummy_data();
         populateCategoryTree();
+        getNewProductForCategorisation();
     }
 
     private void dummy_data()
@@ -147,6 +164,7 @@ public class MainActivity extends AppCompatActivity {
                     it.remove(); // avoids a ConcurrentModificationException
                 }
                 recyclerview.setAdapter(new ExpandableListAdapter(mCategoryList));
+                mProgress.dismiss();
             }
 
             @Override
@@ -156,8 +174,38 @@ public class MainActivity extends AppCompatActivity {
                 // ...
             }
         });
+    }
 
+    private void getNewProductForCategorisation()
+    {
+        Query newItem = mDatabase.getReference().child("item_titles").limitToFirst(1);
 
+        newItem.addValueEventListener(new ValueEventListener() {
+            @Override
+            public void onDataChange(DataSnapshot dataSnapshot) {
+                // Get product categories object and use the values to update the UI
+                //ProductCategory pc = dataSnapshot.getValue(ProductCategory.class);
+                //mCategoryMap = (HashMap<String, Object>) dataSnapshot.getValue();
+                mProductsList.clear();
+                for (DataSnapshot postSnapshot: dataSnapshot.getChildren()) {
+                    mProduct = postSnapshot.getValue(Product.class);
+                    mProductsList.add(mProduct);
 
+                    // here you can access to name property like university.name
+
+                }
+//                mProductsList = (ArrayList<Product>)dataSnapshot.getValue();
+//                mProduct = mProductsList.get(1);
+                Log.w(TAG, mProduct.getTitle());
+                mItemTitleTextView.setText(mProduct.getTitle());
+            }
+
+            @Override
+            public void onCancelled(DatabaseError databaseError) {
+                // Getting Post failed, log a message
+                Log.w(TAG, "loadPost:onCancelled", databaseError.toException());
+                // ...
+            }
+        });
     }
 }
