@@ -25,6 +25,7 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Random;
 
 public class MainActivity extends AppCompatActivity {
 
@@ -40,7 +41,7 @@ public class MainActivity extends AppCompatActivity {
     private List<ExpandableListAdapter.Item> mCategoryList;
     private Product mProduct;
     private List<Product> mProductsList;
-
+    private long mNumItems = 1;
     //views
     private TextView mItemTitleTextView;
     private ProgressDialog mProgress;
@@ -79,14 +80,22 @@ public class MainActivity extends AppCompatActivity {
         fab.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-                Snackbar.make(view, username, Snackbar.LENGTH_LONG)
-                        .setAction("Action", null).show();
+//                Snackbar.make(view, username, Snackbar.LENGTH_LONG)
+//                        .setAction("Action", null).show();
+
+//                Snackbar.make(view, "Loading new product ...", Snackbar.LENGTH_LONG)
+//                        .setAction("Action", null).show();
+
+                getNewProductForCategorisation();
+
             }
         });
 
+        //firebase calls -- get data to set up the UI
         //dummy_data();
+        getCountOfProducts();
         populateCategoryTree();
-        getNewProductForCategorisation();
+
     }
 
     private void dummy_data()
@@ -145,7 +154,7 @@ public class MainActivity extends AppCompatActivity {
                     HashMap subcats = (HashMap)obj.get("sub_cats");
                     Iterator sc = subcats.entrySet().iterator();
 
-                    Log.w(TAG+"-c-", title);
+                    //Log.w(TAG+"-c-", title);
 
                     ExpandableListAdapter.Item rootCat = new ExpandableListAdapter.Item(ExpandableListAdapter.HEADER, title);
                     rootCat.invisibleChildren = new ArrayList<>();
@@ -154,7 +163,7 @@ public class MainActivity extends AppCompatActivity {
                         Map.Entry spair = (Map.Entry)sc.next();
                         HashMap sobj = (HashMap)spair.getValue();
                         String stitle = (String)sobj.get("title");
-                        Log.w(TAG + "---sc-", stitle);
+                        //Log.w(TAG + "---sc-", stitle);
 
                         rootCat.invisibleChildren.add(new ExpandableListAdapter.Item(ExpandableListAdapter.CHILD, stitle));
                         sc.remove();
@@ -164,7 +173,6 @@ public class MainActivity extends AppCompatActivity {
                     it.remove(); // avoids a ConcurrentModificationException
                 }
                 recyclerview.setAdapter(new ExpandableListAdapter(mCategoryList));
-                mProgress.dismiss();
             }
 
             @Override
@@ -176,35 +184,77 @@ public class MainActivity extends AppCompatActivity {
         });
     }
 
-    private void getNewProductForCategorisation()
+    private void getCountOfProducts()
     {
-        Query newItem = mDatabase.getReference().child("item_titles").limitToFirst(1);
-
-        newItem.addValueEventListener(new ValueEventListener() {
+        Query countItemsQuery = mDatabase.getReference().child("item_titles");
+        // Becasue there is no count function, you have to get all the results and count them. !
+        countItemsQuery.addValueEventListener(new ValueEventListener() {
             @Override
             public void onDataChange(DataSnapshot dataSnapshot) {
-                // Get product categories object and use the values to update the UI
-                //ProductCategory pc = dataSnapshot.getValue(ProductCategory.class);
-                //mCategoryMap = (HashMap<String, Object>) dataSnapshot.getValue();
-                mProductsList.clear();
-                for (DataSnapshot postSnapshot: dataSnapshot.getChildren()) {
-                    mProduct = postSnapshot.getValue(Product.class);
-                    mProductsList.add(mProduct);
-
-                    // here you can access to name property like university.name
-
-                }
-//                mProductsList = (ArrayList<Product>)dataSnapshot.getValue();
-//                mProduct = mProductsList.get(1);
-                Log.w(TAG, mProduct.getTitle());
-                mItemTitleTextView.setText(mProduct.getTitle());
+                mNumItems = dataSnapshot.getChildrenCount();
+                Log.w(TAG + "mNumItems=", String.valueOf(mNumItems));
+                getNewProductForCategorisation();
             }
 
             @Override
             public void onCancelled(DatabaseError databaseError) {
                 // Getting Post failed, log a message
                 Log.w(TAG, "loadPost:onCancelled", databaseError.toException());
-                // ...
+                mItemTitleTextView.setText("** Error getting product count!! **");
+                mProgress.dismiss();
+            }
+        });
+
+    }
+
+    private void getNewProductForCategorisation()
+    {
+        mProgress.show();
+        //introduce a random range for selection
+        Random r = new Random();
+//        int buffer = 10;
+//        int randomItem = r.nextInt((((int)mNumItems-buffer) - buffer) + 1) + buffer;
+//        Log.w(TAG+"randomItem=", String.valueOf(randomItem));
+        int randomItem = r.nextInt((((int)mNumItems) - 0) + 1) + 0;
+        Log.w(TAG+"randomItem=", String.valueOf(randomItem));
+
+//        Query newItem = mDatabase.getReference().child("item_titles")
+//                                                .orderByChild("category_id")
+//                                                //.startAt(String.valueOf(randomItem))
+//                                                //.equalTo("-1")
+//                                                .limitToFirst(1);
+
+        Query newItem = mDatabase.getReference().child("item_titles")
+                .orderByChild("itemOrder")
+                .startAt(String.valueOf(randomItem))
+                //.equalTo("-1")
+                .limitToFirst(1);
+
+        newItem.addValueEventListener(new ValueEventListener() {
+            @Override
+            public void onDataChange(DataSnapshot dataSnapshot) {
+                // Get product categories object and use the values to update the UI
+                //Log.w(TAG, dataSnapshot.getValue().toString());
+                mProductsList.clear();
+                for (DataSnapshot postSnapshot: dataSnapshot.getChildren()) {
+                    mProduct = postSnapshot.getValue(Product.class);
+                    if(mProduct.category_id == "-1")
+                    {
+                        mProductsList.add(mProduct);
+                        break;
+                    }
+                }
+                Log.w(TAG, mProduct.getTitle());
+                mItemTitleTextView.setText(mProduct.getTitle());
+                mProgress.dismiss();
+            }
+
+            @Override
+            public void onCancelled(DatabaseError databaseError) {
+                // Getting Post failed, log a message
+                Log.w(TAG, "loadPost:onCancelled", databaseError.toException());
+                mItemTitleTextView.setText("** Error getting product!! **");
+                mProgress.dismiss();
             }
         });
     }

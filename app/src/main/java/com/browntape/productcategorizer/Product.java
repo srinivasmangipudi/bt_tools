@@ -6,6 +6,7 @@ package com.browntape.productcategorizer;
 
 public class Product {
     public String id;
+    public String itemOrder;
     public String title;
     public String sku_code_from_channel;
     public String company_id;
@@ -14,8 +15,10 @@ public class Product {
 
     public Product(){}
 
-    public Product(String id, String title, String sku_code_from_channel, String company_id, String number, String category_id) {
+    public Product(String id, String itemOrder, String title, String sku_code_from_channel, String company_id, String number, String category_id) {
         this.id = id;
+        this.itemOrder = itemOrder;
+
         this.title = title;
         this.sku_code_from_channel = sku_code_from_channel;
         this.company_id = company_id;
@@ -29,6 +32,14 @@ public class Product {
 
     public void setId(String id) {
         this.id = id;
+    }
+
+    public String getItemOrder() {
+        return itemOrder;
+    }
+
+    public void setItemOrder(String itemOrder) {
+        this.itemOrder = itemOrder;
     }
 
     public String getTitle() {
