@@ -2,9 +2,12 @@ package com.browntape.productcategorizer;
 
 import android.app.ProgressDialog;
 import android.content.Intent;
+import android.content.res.ColorStateList;
+import android.graphics.Color;
 import android.os.Bundle;
 import android.support.design.widget.FloatingActionButton;
 import android.support.design.widget.Snackbar;
+import android.support.v4.content.ContextCompat;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.LinearLayoutManager;
 import android.support.v7.widget.RecyclerView;
@@ -39,12 +42,16 @@ public class MainActivity extends AppCompatActivity {
     private Map<String, Object> mCategoryMap;
     private Map<String, Object> mProductMap;
     private List<ExpandableListAdapter.Item> mCategoryList;
+    private ExpandableListAdapter mAdapter;
     private Product mProduct;
     private List<Product> mProductsList;
     private long mNumItems = 1;
+    private ProductCategory[] mProductCats;
+
     //views
     private TextView mItemTitleTextView;
     private ProgressDialog mProgress;
+    private FloatingActionButton mFab;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -56,11 +63,12 @@ public class MainActivity extends AppCompatActivity {
         recyclerview = (RecyclerView) findViewById(R.id.recyclerview);
         recyclerview.setLayoutManager(new LinearLayoutManager(this, LinearLayoutManager.VERTICAL, false));
 
-        FloatingActionButton fab = (FloatingActionButton) findViewById(R.id.fab);
+        mFab = (FloatingActionButton) findViewById(R.id.fab);
         //FirebaseApp.getDefaultConfig().setPersistenceEnabled(true);
         mCategoryList = new ArrayList<>();
         mProductsList = new ArrayList<>();
         mDatabase = Utils.getDatabase();
+
 
         Intent intent = getIntent();
         final String userid = intent.getStringExtra("userid"); //if it's a string you stored.
@@ -77,7 +85,7 @@ public class MainActivity extends AppCompatActivity {
 
         writeNewUser(userid, username, email);
 
-        fab.setOnClickListener(new View.OnClickListener() {
+        mFab.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
 //                Snackbar.make(view, username, Snackbar.LENGTH_LONG)
@@ -86,7 +94,15 @@ public class MainActivity extends AppCompatActivity {
 //                Snackbar.make(view, "Loading new product ...", Snackbar.LENGTH_LONG)
 //                        .setAction("Action", null).show();
 
-                getNewProductForCategorisation();
+                if(mAdapter != null && mAdapter.mSelectedCatId != "-1")
+                {
+                    finalizeProductCategorisation();
+                }
+                else
+                {
+                    getNewProductForCategorisation();
+                }
+
 
             }
         });
@@ -101,27 +117,28 @@ public class MainActivity extends AppCompatActivity {
     private void dummy_data()
     {
         List<ExpandableListAdapter.Item> data = new ArrayList<>();
+        String id = "tempid";
 
-        data.add(new ExpandableListAdapter.Item(ExpandableListAdapter.HEADER, "Fruits"));
-        data.add(new ExpandableListAdapter.Item(ExpandableListAdapter.CHILD, "Apple"));
-        data.add(new ExpandableListAdapter.Item(ExpandableListAdapter.CHILD, "Orange"));
-        data.add(new ExpandableListAdapter.Item(ExpandableListAdapter.CHILD, "Banana"));
-        data.add(new ExpandableListAdapter.Item(ExpandableListAdapter.HEADER, "Cars"));
-        data.add(new ExpandableListAdapter.Item(ExpandableListAdapter.CHILD, "Audi"));
-        data.add(new ExpandableListAdapter.Item(ExpandableListAdapter.CHILD, "Aston Martin"));
-        data.add(new ExpandableListAdapter.Item(ExpandableListAdapter.CHILD, "BMW"));
-        data.add(new ExpandableListAdapter.Item(ExpandableListAdapter.CHILD, "Cadillac"));
+        data.add(new ExpandableListAdapter.Item(ExpandableListAdapter.HEADER, "Fruits", id));
+        data.add(new ExpandableListAdapter.Item(ExpandableListAdapter.CHILD, "Apple", id));
+        data.add(new ExpandableListAdapter.Item(ExpandableListAdapter.CHILD, "Orange", id));
+        data.add(new ExpandableListAdapter.Item(ExpandableListAdapter.CHILD, "Banana", id));
+        data.add(new ExpandableListAdapter.Item(ExpandableListAdapter.HEADER, "Cars", id));
+        data.add(new ExpandableListAdapter.Item(ExpandableListAdapter.CHILD, "Audi", id));
+        data.add(new ExpandableListAdapter.Item(ExpandableListAdapter.CHILD, "Aston Martin", id));
+        data.add(new ExpandableListAdapter.Item(ExpandableListAdapter.CHILD, "BMW", id));
+        data.add(new ExpandableListAdapter.Item(ExpandableListAdapter.CHILD, "Cadillac", id));
 
-        ExpandableListAdapter.Item places = new ExpandableListAdapter.Item(ExpandableListAdapter.HEADER, "Places");
+        ExpandableListAdapter.Item places = new ExpandableListAdapter.Item(ExpandableListAdapter.HEADER, "Places", id);
         places.invisibleChildren = new ArrayList<>();
-        places.invisibleChildren.add(new ExpandableListAdapter.Item(ExpandableListAdapter.CHILD, "Kerala"));
-        places.invisibleChildren.add(new ExpandableListAdapter.Item(ExpandableListAdapter.CHILD, "Tamil Nadu"));
-        places.invisibleChildren.add(new ExpandableListAdapter.Item(ExpandableListAdapter.CHILD, "Karnataka"));
-        places.invisibleChildren.add(new ExpandableListAdapter.Item(ExpandableListAdapter.CHILD, "Maharashtra"));
+        places.invisibleChildren.add(new ExpandableListAdapter.Item(ExpandableListAdapter.CHILD, "Kerala", id));
+        places.invisibleChildren.add(new ExpandableListAdapter.Item(ExpandableListAdapter.CHILD, "Tamil Nadu", id));
+        places.invisibleChildren.add(new ExpandableListAdapter.Item(ExpandableListAdapter.CHILD, "Karnataka", id));
+        places.invisibleChildren.add(new ExpandableListAdapter.Item(ExpandableListAdapter.CHILD, "Maharashtra", id));
 
         data.add(places);
 
-        recyclerview.setAdapter(new ExpandableListAdapter(data));
+        recyclerview.setAdapter(new ExpandableListAdapter(data, this));
     }
 
     private void writeNewUser(String userId, String name, String email) {
@@ -134,16 +151,16 @@ public class MainActivity extends AppCompatActivity {
 
     private void populateCategoryTree()
     {
-        Query mProductCatTree = mDatabase.getReference().child("product_categories").orderByKey();
+        final Query mProductCatTree = mDatabase.getReference().child("product_categories").orderByKey();
 
         mProductCatTree.addValueEventListener(new ValueEventListener() {
             @Override
             public void onDataChange(DataSnapshot dataSnapshot) {
                 // Get product categories object and use the values to update the UI
-                //ProductCategory pc = dataSnapshot.getValue(ProductCategory.class);
                 mCategoryMap = (HashMap<String, Object>) dataSnapshot.getValue();
-                // ...
-                //Log.w(TAG, mCategoryMap.toString());
+                Log.w(TAG + "# of Categories=", String.valueOf(mCategoryMap.size()));
+                mProductCats = new ProductCategory[mCategoryMap.size()];
+
                 Iterator it = mCategoryMap.entrySet().iterator();
                 while (it.hasNext()) {
                     Map.Entry pair = (Map.Entry)it.next();
@@ -151,28 +168,30 @@ public class MainActivity extends AppCompatActivity {
                     //System.out.println(pair.getKey() + " = " + pair.getValue());
                     HashMap obj = (HashMap)pair.getValue();
                     String title = (String)obj.get("title");
+                    String item_id = (String)obj.get("id");
                     HashMap subcats = (HashMap)obj.get("sub_cats");
                     Iterator sc = subcats.entrySet().iterator();
 
                     //Log.w(TAG+"-c-", title);
 
-                    ExpandableListAdapter.Item rootCat = new ExpandableListAdapter.Item(ExpandableListAdapter.HEADER, title);
+                    ExpandableListAdapter.Item rootCat = new ExpandableListAdapter.Item(ExpandableListAdapter.HEADER, title, item_id);
                     rootCat.invisibleChildren = new ArrayList<>();
                     //loop through the sub categories
                     while (sc.hasNext()) {
                         Map.Entry spair = (Map.Entry)sc.next();
                         HashMap sobj = (HashMap)spair.getValue();
                         String stitle = (String)sobj.get("title");
+                        String sitem_id = (String)sobj.get("id");
                         //Log.w(TAG + "---sc-", stitle);
 
-                        rootCat.invisibleChildren.add(new ExpandableListAdapter.Item(ExpandableListAdapter.CHILD, stitle));
+                        rootCat.invisibleChildren.add(new ExpandableListAdapter.Item(ExpandableListAdapter.CHILD, stitle, sitem_id));
                         sc.remove();
                     }
 
                     mCategoryList.add(rootCat);
                     it.remove(); // avoids a ConcurrentModificationException
                 }
-                recyclerview.setAdapter(new ExpandableListAdapter(mCategoryList));
+                addCatTreeAdapter();
             }
 
             @Override
@@ -182,6 +201,13 @@ public class MainActivity extends AppCompatActivity {
                 // ...
             }
         });
+    }
+
+    private void addCatTreeAdapter()
+    {
+        mAdapter = new ExpandableListAdapter(mCategoryList,this);
+        recyclerview.setAdapter(mAdapter);
+
     }
 
     private void getCountOfProducts()
@@ -207,9 +233,36 @@ public class MainActivity extends AppCompatActivity {
 
     }
 
+    public void saveProductCategorisation(String id)
+    {
+        View parentLayout = findViewById(R.id.content_main);
+        Snackbar.make(parentLayout, "Tagging product categorisation id ..." + id, Snackbar.LENGTH_LONG)
+                        .setAction("Action", null).show();
+
+        Log.w(TAG+"selected catid=", mAdapter.mSelectedCatId);
+        mFab.setBackgroundTintList(ColorStateList.valueOf(Color.RED));
+        mFab.setImageDrawable(ContextCompat.getDrawable(this, R.drawable.ic_save_black_24dp));
+    }
+
+    public void finalizeProductCategorisation()
+    {
+        mProgress.show();
+        mProgress.setTitle("Saving");
+        mProgress.setMessage("Wait while saving...");
+        mDatabase.getReference().child("item_titles").child(mProduct.id).child("category_id").setValue(mAdapter.mSelectedCatId);
+        mProgress.dismiss();
+
+        mFab.setBackgroundTintList(ColorStateList.valueOf(getResources().getColor(R.color.colorAccent)));
+        mFab.setImageDrawable(ContextCompat.getDrawable(getApplicationContext(), R.drawable.ic_refresh_black_24dp));
+
+        populateCategoryTree();
+        getNewProductForCategorisation();
+    }
+
     private void getNewProductForCategorisation()
     {
         mProgress.show();
+
         //introduce a random range for selection
         Random r = new Random();
 //        int buffer = 10;
@@ -244,8 +297,11 @@ public class MainActivity extends AppCompatActivity {
                         break;
                     }
                 }
+                Log.w(TAG+" ItemId=", mProduct.getId());
                 Log.w(TAG, mProduct.getTitle());
                 mItemTitleTextView.setText(mProduct.getTitle());
+//                mFab.setBackgroundTintList(ColorStateList.valueOf(getResources().getColor(R.color.colorAccent)));
+//                mFab.setImageDrawable(ContextCompat.getDrawable(getApplicationContext(), R.drawable.ic_save_black_24dp));
                 mProgress.dismiss();
             }
 

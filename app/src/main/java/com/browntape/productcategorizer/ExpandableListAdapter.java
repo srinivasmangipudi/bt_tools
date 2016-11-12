@@ -5,6 +5,7 @@ package com.browntape.productcategorizer;
  */
 
 import android.content.Context;
+import android.graphics.Color;
 import android.support.v7.widget.RecyclerView;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -20,9 +21,14 @@ public class ExpandableListAdapter extends RecyclerView.Adapter<RecyclerView.Vie
     public static final int CHILD = 1;
 
     private List<Item> data;
+    public String mSelectedCatId = "-1";
+    private Context mContext;
+    private int mSelPosition=0;
+    private TextView mOldSelTxtView;
 
-    public ExpandableListAdapter(List<Item> data) {
+    public ExpandableListAdapter(List<Item> data, Context context) {
         this.data = data;
+        mContext = context;
     }
 
     @Override
@@ -64,7 +70,7 @@ public class ExpandableListAdapter extends RecyclerView.Adapter<RecyclerView.Vie
                 } else {
                     itemController.btn_expand_toggle.setImageResource(R.drawable.circle_plus);
                 }
-                itemController.btn_expand_toggle.setOnClickListener(new View.OnClickListener() {
+                View.OnClickListener lstnr = new View.OnClickListener() {
                     @Override
                     public void onClick(View v) {
                         if (item.invisibleChildren == null) {
@@ -89,11 +95,71 @@ public class ExpandableListAdapter extends RecyclerView.Adapter<RecyclerView.Vie
                             item.invisibleChildren = null;
                         }
                     }
-                });
+                };
+                itemController.btn_expand_toggle.setOnClickListener(lstnr);
+                itemController.header_title.setOnClickListener(lstnr);
+
+//                itemController.btn_expand_toggle.setOnClickListener(new View.OnClickListener() {
+//                    @Override
+//                    public void onClick(View v) {
+//                        if (item.invisibleChildren == null) {
+//                            item.invisibleChildren = new ArrayList<Item>();
+//                            int count = 0;
+//                            int pos = data.indexOf(itemController.refferalItem);
+//                            while (data.size() > pos + 1 && data.get(pos + 1).type == CHILD) {
+//                                item.invisibleChildren.add(data.remove(pos + 1));
+//                                count++;
+//                            }
+//                            notifyItemRangeRemoved(pos + 1, count);
+//                            itemController.btn_expand_toggle.setImageResource(R.drawable.circle_plus);
+//                        } else {
+//                            int pos = data.indexOf(itemController.refferalItem);
+//                            int index = pos + 1;
+//                            for (Item i : item.invisibleChildren) {
+//                                data.add(index, i);
+//                                index++;
+//                            }
+//                            notifyItemRangeInserted(pos + 1, index - pos - 1);
+//                            itemController.btn_expand_toggle.setImageResource(R.drawable.circle_minus);
+//                            item.invisibleChildren = null;
+//                        }
+//                    }
+//                });
                 break;
             case CHILD:
-                TextView itemTextView = (TextView) holder.itemView;
+                final TextView itemTextView = (TextView) holder.itemView;
+
+
                 itemTextView.setText(data.get(position).text);
+                final String itemId = data.get(position).item_id;
+                final int tempPos = position;
+                if(itemId == mSelectedCatId)
+                {
+                    itemTextView.setBackgroundColor(Color.RED);
+                }
+                else
+                {
+                    itemTextView.setBackgroundColor(Color.WHITE);
+                }
+
+
+                View.OnClickListener lstnrChild = new View.OnClickListener() {
+                    @Override
+                    public void onClick(View v) {
+                        if(mOldSelTxtView != null)
+                        {
+                            mOldSelTxtView.setBackgroundColor(Color.WHITE);
+                        }
+                        itemTextView.setBackgroundColor(Color.RED);
+                        mSelectedCatId = itemId;
+                        mSelPosition = tempPos;
+                        mOldSelTxtView = itemTextView;
+                        if(mContext instanceof MainActivity){
+                            ((MainActivity)mContext).saveProductCategorisation(mSelectedCatId);
+                        }
+                    }
+                };
+                itemTextView.setOnClickListener(lstnrChild);
                 break;
         }
     }
@@ -123,14 +189,16 @@ public class ExpandableListAdapter extends RecyclerView.Adapter<RecyclerView.Vie
     public static class Item {
         public int type;
         public String text;
+        public String item_id;
         public List<Item> invisibleChildren;
 
         public Item() {
         }
 
-        public Item(int type, String text) {
+        public Item(int type, String text, String item_id) {
             this.type = type;
             this.text = text;
+            this.item_id = item_id;
         }
     }
 }
